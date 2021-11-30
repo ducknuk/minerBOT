@@ -167,7 +167,7 @@ async function listServices(id, del){
         });
     } else{
         let promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n';
-        await bot.sendMessage(id, promo + 'Вы незарегистрированны в системе бота, пожалуйста введите команду "/register"  через пробел укажите ФИО');
+        await bot.sendMessage(id, promo + 'Вы не зарегистрированы в системе бота, пожалуйста введите команду "/register" и через пробел укажите ФИО');
     }
 
     // let promo = 'Выберите действие:';
@@ -195,13 +195,13 @@ bot.onText(/\/register (.+)/, (msg, match) => {
                 const gsapi = google.sheets({ version: 'v4', auth: cl });
                 const rowCounter = {
                     spreadsheetId: config.spreadsheetId,
-                    range: `Лист3!A1:A`
+                    range: `${config.listRegister}!A1:A`
                 };
                 let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
                 let lastRow = lastRowData.data.values.length + 1;
                 const updateOptions = {
                     spreadsheetId: config.spreadsheetId,
-                    range: `Лист3!A${lastRow}:C${lastRow}`,
+                    range: `${config.listRegister}!A${lastRow}:C${lastRow}`,
                     valueInputOption: 'USER_ENTERED',
                     resource: {
                         values: [[ msg.chat.id, FIO, tel ]],
