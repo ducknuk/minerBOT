@@ -128,24 +128,100 @@ async function listServices(id, del){
         delete dialog.extraModel;
         endpoint = false;
     }
+
     const dialogIndex = dialoges.indexOf(x => x.chatId === id);
-    console.log(dialoges);
-    let promo = 'Выберите действие:';
-    if (dialogIndex > -1) dialoges.splice(dialogIndex, 1);
-    else promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n' + promo;
-    
-    await bot.sendMessage(id, promo, {
-        reply_markup: JSON.stringify({
-            keyboard: [
-                [{text: ServiceList.shipment, callback_data: 'makechose1'}],
-                [{text: ServiceList.reception, callback_data: 'makechose2'}],
-            ],
-            resize_keyboard :true,
-            one_time_keyboard: true
-        }),
-        parse_mode: 'Markdown'
-    });
+    console.log(id);
+
+    const gsapi = google.sheets({ version: 'v4', auth: client });
+    const getAllData = {
+        spreadsheetId: config.spreadsheetId,
+        range: `Лист3!A2:A` //get all chat IDs
+    };
+    let data = await gsapi.spreadsheets.values.get(getAllData);
+    let result = data.data.values;
+    let qwe = [].concat(...result);
+    console.log(qwe);
+    let registered;
+    for (let i = 0; i < qwe.length; i++){
+        if ( qwe[i] === id.toString() ) {
+            console.log('true');
+            registered = true;
+        }
+        else {
+            console.log('false');
+            registered = false;
+        }
+    }
+    if (registered){
+        let promo = 'Выберите действие:';
+        await bot.sendMessage(id, promo, {
+            reply_markup: JSON.stringify({
+                keyboard: [
+                    [{text: ServiceList.shipment, callback_data: 'makechose1'}],
+                    [{text: ServiceList.reception, callback_data: 'makechose2'}],
+                ],
+                resize_keyboard :true,
+                one_time_keyboard: true
+            }),
+            parse_mode: 'Markdown'
+        });
+    } else{
+        let promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n';
+        await bot.sendMessage(id, promo + 'Вы незарегистрированны в системе бота, пожалуйста введите команду "/register"  через пробел укажите ФИО');
+    }
+
+    // let promo = 'Выберите действие:';
+    // if (dialogIndex > -1) dialoges.splice(dialogIndex, 1);
+    // else promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n' + promo;
+    // await bot.sendMessage(id, promo, {
+    //     reply_markup: JSON.stringify({
+    //         keyboard: [
+    //             [{text: ServiceList.shipment, callback_data: 'makechose1'}],
+    //             [{text: ServiceList.reception, callback_data: 'makechose2'}],
+    //         ],
+    //         resize_keyboard :true,
+    //         one_time_keyboard: true
+    //     }),
+    //     parse_mode: 'Markdown'
+    // });
 }
+
+bot.onText(/\/register (.+)/, (msg, match) => {
+    let FIO = (msg.text).replace('/register ', '');
+    bot.sendMessage(msg.chat.id, "Введите номер телефона: \n").then(r =>
+        bot.onText(/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im, (msg, match) => {
+            let tel = msg.text;
+            async function gsrun_FIO(cl) {
+                const gsapi = google.sheets({ version: 'v4', auth: cl });
+                const rowCounter = {
+                    spreadsheetId: config.spreadsheetId,
+                    range: `Лист3!A1:A`
+                };
+                let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
+                let lastRow = lastRowData.data.values.length + 1;
+                const updateOptions = {
+                    spreadsheetId: config.spreadsheetId,
+                    range: `Лист3!A${lastRow}:C${lastRow}`,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: {
+                        values: [[ msg.chat.id, FIO, tel ]],
+                    }
+                };
+                let data = await gsapi.spreadsheets.values.update(updateOptions);
+                console.log(data);
+                await bot.sendMessage(msg.chat.id, "Регистрирую данные");
+                if ( (data.status === 200)){
+                    delete msg.text;
+                    await bot.sendMessage(msg.chat.id, "Данные успешно зарегистрированы");
+                    await listServices(msg.chat.id);
+                } else {
+                    await bot.sendMessage(msg.chat.id, "Не удалось загрузить данные в таблицу, попробуйте еще раз.");
+                }
+            }
+            gsrun_FIO(client);
+        })
+    );
+});
 
 bot.onText(/\/(help|start|services|back)/, async (msg) => {
     await listServices(msg.chat.id);
