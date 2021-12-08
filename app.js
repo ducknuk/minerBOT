@@ -6,25 +6,8 @@ const {google} = require('googleapis');
 const keys = require('./secret.json');
 let emoji = require('node-emoji').emoji;
 
-let date_ob = new Date();
-let day = ("0" + date_ob.getDate()).slice(-2);
-let month = ("0" + (date_ob.getMonth() + 1)).slice(-2);
-let year = date_ob.getFullYear();
-
-let date = day + "-" + month + "-" + year;
-
-let hours = date_ob.getHours();
-let minutes = date_ob.getMinutes();
-let seconds = date_ob.getSeconds();
-
-let dateTime = hours + ":" + minutes + ":" + seconds;
-
-const client = new google.auth.JWT(
-    keys.client_email,
-    null,
-    keys.private_key,
-    ['https://www.googleapis.com/auth/spreadsheets']
-);
+const dateLib = require('./particles/data.js');
+const clientLib = require('./particles/client.js');
 
 async function gsrun(cl, range) {
     const gsapi = google.sheets({ version: 'v4', auth: cl });
@@ -37,6 +20,7 @@ async function gsrun(cl, range) {
 }
 
 const bot = new TelegramBot(token, { polling: true });
+const PhoneRegex = /^((\+7|7|8)+(\-?\s*?[0-9]){10})$/;
 let dialoges = [];
 let endpoint;
 
@@ -54,6 +38,10 @@ const ServiceList = {
     extraDel: '',
     extraShip: '',
     extraModel: '',
+    FIO: '',
+    phone: '',
+    newUser: '__Зарегистрироваться__',
+    regState: ''
 };
 
 function fillInKeyboard(list, opt, reset) {
@@ -99,132 +87,141 @@ const DialogesStates =
     // ожидание подтверждения данных пользователем
     waitForAccept: "wait_for_accept",
     // загрузка
-    loading: "loading"
+    loading: "loading",
+    FIO: "FIO",
+    phone: "phone",
+    regState: ''
 };
 
 
 bot.onText(/\/echo (.+)/, (msg, match) => {
+    const dialog = dialoges.find(x => x.chatId === id);
+    console.log("dateTime: " + dateLib.dateTime);
+    console.log("date: " + dateLib.date);
+
     const chatId = msg.chat.id;
     const resp = match[1];
     bot.sendMessage(chatId, resp);
 });
 
 async function listServices(id, del){
-    if (del){
-        const dialog = dialoges.find(x => x.chatId === id);
-        delete dialog.chatId;
-        delete dialog.state;
-        delete dialog.value;
-        delete dialog.valueOfPoint;
-        delete dialog.targetObject;
-        delete dialog.modelValue;
-        delete dialog.numberOfApparat;
-        delete dialog.responsibleForDelivery;
-        delete dialog.responsibleForShipment;
-        delete dialog.comment;
-        delete dialog.extra;
-        delete dialog.extraDel;
-        delete dialog.extraShip;
-        delete dialog.extraModel;
-        endpoint = false;
-    }
 
     const dialogIndex = dialoges.indexOf(x => x.chatId === id);
+    if(del && dialogIndex >= 0){
+        dialoges.splice(dialogIndex, 1);
+        endpoint = false;
+    }
     console.log(id);
 
-    const gsapi = google.sheets({ version: 'v4', auth: client });
+    const gsapi = google.sheets({ version: 'v4', auth: clientLib.client });
     const getAllData = {
         spreadsheetId: config.spreadsheetId,
-        range: `Лист3!A2:A` //get all chat IDs
+        range: `${config.listRegister}!A2:A` //get all chat IDs
     };
     let data = await gsapi.spreadsheets.values.get(getAllData);
     let result = data.data.values;
-    let qwe = [].concat(...result);
-    console.log(qwe);
-    let registered;
-    for (let i = 0; i < qwe.length; i++){
-        if ( qwe[i] === id.toString() ) {
-            console.log('true');
-            registered = true;
-        }
-        else {
-            console.log('false');
-            registered = false;
-        }
-    }
-    if (registered){
-        let promo = 'Выберите действие:';
-        await bot.sendMessage(id, promo, {
-            reply_markup: JSON.stringify({
-                keyboard: [
-                    [{text: ServiceList.shipment, callback_data: 'makechose1'}],
-                    [{text: ServiceList.reception, callback_data: 'makechose2'}],
-                ],
-                resize_keyboard :true,
-                one_time_keyboard: true
-            }),
-            parse_mode: 'Markdown'
-        });
-    } else{
-        let promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n';
-        await bot.sendMessage(id, promo + 'Вы не зарегистрированы в системе бота, пожалуйста введите команду "/register" и через пробел укажите ФИО');
-    }
+    console.log("result: " + result);
 
-    // let promo = 'Выберите действие:';
-    // if (dialogIndex > -1) dialoges.splice(dialogIndex, 1);
-    // else promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n' + promo;
-    // await bot.sendMessage(id, promo, {
-    //     reply_markup: JSON.stringify({
-    //         keyboard: [
-    //             [{text: ServiceList.shipment, callback_data: 'makechose1'}],
-    //             [{text: ServiceList.reception, callback_data: 'makechose2'}],
-    //         ],
-    //         resize_keyboard :true,
-    //         one_time_keyboard: true
-    //     }),
-    //     parse_mode: 'Markdown'
-    // });
+    if (result === undefined ){
+        let promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n';
+        await bot.sendMessage(id, promo + 'Вы не зарегистрированы в системе бота.\nВведите пожалуйста команду "/register" и свое ФИО.', {
+            reply_markup: JSON.stringify({
+                hide_keyboard: true
+            })
+        });
+    } else {
+        let resultForArray = [].concat(...result);
+        for (let i = 0; i < resultForArray.length; i++) {
+            if (resultForArray[i] === id.toString()) {
+                console.log('true');
+                let promo = 'Выберите действие:';
+                await bot.sendMessage(id, promo, {
+                    reply_markup: JSON.stringify({
+                        keyboard: [
+                            [{text: ServiceList.shipment, callback_data: 'makechose1'}],
+                            [{text: ServiceList.reception, callback_data: 'makechose2'}],
+                        ],
+                        resize_keyboard :true,
+                        one_time_keyboard: true
+                    }),
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+        }
+        let promo = 'Добро пожаловать в TelegramBot Учета отгрузок \n';
+        await bot.sendMessage(id, promo + 'Вы не зарегистрированы в системе бота.\nВведите пожалуйста команду "/register" и свое ФИО. ', {
+            reply_markup: JSON.stringify({
+                hide_keyboard: true
+            })
+        });
+    }
 }
 
-bot.onText(/\/register (.+)/, (msg, match) => {
+bot.onText(/\/phone\s*(.+)/, async (msg, match) => {
+    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+    if (!dialog){
+        await bot.sendMessage(msg.chat.id, 'Сначала начните с /register');
+        return;
+    }
+    let phone = match[1].replace(/\/phone\s*/, '');
+    console.log(phone);
+    if ( !phone.match(/^((\+7|7|8)+(\-?\s*?[0-9]){10})$/) ){
+        await bot.sendMessage(msg.chat.id, 'Неверно введен номер телефона.\nВведите пожалуйста еще раз');
+        return;
+    }
+    dialog.phone = phone;
+
+    console.log(dialoges);
+    const gsapi = google.sheets({ version: 'v4', auth: clientLib.client });
+    const rowCounter = {
+        spreadsheetId: config.spreadsheetId,
+        range: `${config.listRegister}!A1:A`
+    };
+    let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
+    let lastRow = lastRowData.data.values.length + 1;
+    const updateOptions = {
+        spreadsheetId: config.spreadsheetId,
+        range: `${config.listRegister}!A${lastRow}:C${lastRow}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+            values: [[ msg.chat.id, dialog.FIO, phone.replace('+', '') ]],
+        }
+    };
+    try {
+        let data = await gsapi.spreadsheets.values.update(updateOptions);
+        console.log(data);
+        await bot.sendMessage(msg.chat.id, "Регистрирую данные");
+        if ( (data.status === 200)){
+            dialog.regState = "Done";
+            await bot.sendMessage(msg.chat.id, "Данные успешно зарегистрированы");
+            return await listServices(msg.chat.id, true);
+        } else {
+            await bot.sendMessage(msg.chat.id, "Не удалось загрузить данные в таблицу, попробуйте еще раз.");
+            await listServices(msg.chat.id, true);
+        }
+    } catch (e) {
+        console.log(e);
+    }
+});
+bot.onText(/\/register\s*(.+)/, (msg) => {
     let FIO = (msg.text).replace('/register ', '');
-    bot.sendMessage(msg.chat.id, "Введите номер телефона: \n").then(r =>
-        bot.onText(/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im, (msg, match) => {
-            let tel = msg.text;
-            async function gsrun_FIO(cl) {
-                const gsapi = google.sheets({ version: 'v4', auth: cl });
-                const rowCounter = {
-                    spreadsheetId: config.spreadsheetId,
-                    range: `${config.listRegister}!A1:A`
-                };
-                let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
-                let lastRow = lastRowData.data.values.length + 1;
-                const updateOptions = {
-                    spreadsheetId: config.spreadsheetId,
-                    range: `${config.listRegister}!A${lastRow}:C${lastRow}`,
-                    valueInputOption: 'USER_ENTERED',
-                    resource: {
-                        values: [[ msg.chat.id, FIO, tel ]],
-                    }
-                };
-                let data = await gsapi.spreadsheets.values.update(updateOptions);
-                console.log(data);
-                await bot.sendMessage(msg.chat.id, "Регистрирую данные");
-                if ( (data.status === 200)){
-                    delete msg.text;
-                    await bot.sendMessage(msg.chat.id, "Данные успешно зарегистрированы");
-                    await listServices(msg.chat.id);
-                } else {
-                    await bot.sendMessage(msg.chat.id, "Не удалось загрузить данные в таблицу, попробуйте еще раз.");
-                }
-            }
-            gsrun_FIO(client);
-        })
-    );
+    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+
+    if (dialog){
+        dialog.FIO = FIO;
+        dialog.regState = "PhoneWait";
+    }
+    else dialoges.push({
+        chatId: msg.chat.id,
+        FIO,
+        regState: "PhoneWait"
+    });
+    bot.sendMessage(msg.chat.id, 'Введите номер телефона с помощью команды "/phone": \n');
 });
 
 bot.onText(/\/(help|start|services|back)/, async (msg) => {
-    await listServices(msg.chat.id);
+    await listServices(msg.chat.id, true);
 });
 
 bot.on("polling_error", (msg) => console.log(msg));
@@ -243,6 +240,88 @@ bot.onText(/^[^/].+/, async (msg) => {
     }
     if (msg.text === ServiceList.shipment) await actionHandler('makechose1', msg);
     else if (msg.text === ServiceList.reception) await actionHandler('makechose2', msg);
+});
+
+bot.onText(/\/count\s*(.+)/, (msg) => {
+    let valueOfNumber = (msg.text).replace('/count ', '');
+    console.log(valueOfNumber);
+    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+    if (dialog){
+        dialog.state = DialogesStates.waitForNumberOfApparat;
+        dialog.numberOfApparat = valueOfNumber;
+    }
+    else dialoges.push({
+        chatId: msg.chat.id,
+        state: DialogesStates.waitForNumberOfApparat,
+        numberOfApparat: valueOfNumber,
+        extra: null
+    });
+    console.log(dialoges);
+    let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
+    if (endpoint === true){
+        bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
+            reply_markup: JSON.stringify({
+                inline_keyboard: [
+                    [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
+                    [{text: 'Назад', callback_data: 'farm' + farmNumber }],
+                    [{text: 'В конец', callback_data: 'wait_for_accept'}]
+                ]
+            }),
+            parse_mode: 'Markdown'
+        });
+        delete msg.text;
+    } else {
+        bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
+            reply_markup: JSON.stringify({
+                inline_keyboard: [
+                    [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
+                    [{text: 'Назад', callback_data: 'farm' + farmNumber }]
+                ]
+            }),
+            parse_mode: 'Markdown'
+        });
+        delete msg.text;
+    }
+});
+
+bot.onText(/\/comment\s*(.+)/, (msg) => {
+    let commentValue = (msg.text).replace('/comment ', '');
+    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+    if (dialog){
+        dialog.state = DialogesStates.waitForComment;
+        dialog.comment = commentValue;
+    }
+    else dialoges.push({
+        chatId: msg.chat.id,
+        state: DialogesStates.waitForComment,
+        numberOfApparat: commentValue,
+        extra: null
+    });
+    console.log(dialoges);
+    if (endpoint === true){
+        bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
+            reply_markup: JSON.stringify({
+                inline_keyboard: [
+                    [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
+                    [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
+                    [{text: 'В конец', callback_data: 'wait_for_accept'}]
+                ]
+            }),
+            parse_mode: 'Markdown'
+        });
+        delete msg.text;
+    } else {
+        bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
+            reply_markup: JSON.stringify({
+                inline_keyboard: [
+                    [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
+                    [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
+                ]
+            }),
+            parse_mode: 'Markdown'
+        });
+        delete msg.text;
+    }
 });
 
 async function actionHandler(action, msg) {
@@ -272,7 +351,7 @@ async function actionHandler(action, msg) {
         });
         console.log(dialoges);
         try {
-            menu = await gsrun(client, `${config.listNameMenu}!A2:A`);
+            menu = await gsrun(clientLib.client, `${config.listMenu}!A2:A`);
         } catch (e) {
             console.log(e);
         }
@@ -284,60 +363,7 @@ async function actionHandler(action, msg) {
             }),
             parse_mode: 'Markdown'
         });
-        // if (endpoint === true){
-        //     await bot.sendMessage(msg.chat.id, 'Вы выбрали *' + serviceListValue + '*\n', {
-        //         reply_markup: JSON.stringify({
-        //             inline_keyboard: [
-        //                 [{text: 'Выбор точки для акта *' + serviceListValue + '*', callback_data: 'wait_for_point'}],
-        //                 [{text: 'Назад', callback_data: 'reset'}],
-        //                 [{text: 'В конец', callback_data: 'wait_for_accept'}]
-        //             ]
-        //         }),
-        //         parse_mode: 'Markdown'
-        //     });
-        // } else {
-        //     await bot.sendMessage(msg.chat.id, 'Вы выбрали *' + serviceListValue + '*\n', {
-        //         reply_markup: JSON.stringify({
-        //             inline_keyboard: [
-        //                 [{text: 'Выбор точки для акта *' + serviceListValue + '*', callback_data: 'wait_for_point'}],
-        //                 [{text: 'Назад', callback_data: 'reset'}]
-        //             ]
-        //         }),
-        //         parse_mode: 'Markdown'
-        //     });
-        // }
     }
-    // else if (action === 'wait_for_point') {
-    //     let wayBack;
-    //     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-    //     if (dialog.value === ServiceList.shipment) {
-    //         wayBack = 'wait_for_chose_shipment';
-    //     }else {
-    //         wayBack = 'wait_for_chose_reception';
-    //     }
-    //     if (dialog){
-    //         dialog.state = DialogesStates.waitForPoint;
-    //     }
-    //     else dialoges.push({
-    //         chatId: msg.chat.id,
-    //         state: DialogesStates.waitForPoint,
-    //         extra: null
-    //     });
-    //
-    //     console.log(dialoges);
-    //     try {
-    //         menu = await gsrun(client, 'Лист2!A2:A');
-    //     } catch (e) {
-    //         console.log(e);
-    //     }
-    //     let keyboard_model = fillInKeyboard(menu, 'farm', wayBack);
-    //     await bot.sendMessage(msg.chat.id, 'Выберите точку\n', {
-    //         reply_markup: JSON.stringify({
-    //             inline_keyboard: keyboard_model
-    //         }),
-    //         parse_mode: 'Markdown'
-    //     });
-    // }
     else if (action.match(/farm\d/)) {
         let valueOfPointRus = "Ферма " + action.slice(action.length - 1);
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -352,7 +378,7 @@ async function actionHandler(action, msg) {
         });
         console.log(dialoges);
         try {
-            menu = await gsrun(client, `${config.listNameMenu}!B2:B`);
+            menu = await gsrun(clientLib.client, `${config.listMenu}!B2:B`);
         } catch (e) {
             console.log(e);
         }
@@ -368,66 +394,9 @@ async function actionHandler(action, msg) {
             parse_mode: 'Markdown'
         });
     }
-        // if (endpoint === true){
-        //     await bot.sendMessage(msg.chat.id, 'Выбрана ' + valueOfPointRus + '\n', {
-        //         reply_markup: JSON.stringify({
-        //             inline_keyboard: [
-        //                 [{text: 'Выбор целевого объекта', callback_data: 'wait_for_target_object'}],
-        //                 [{text: 'Назад', callback_data: 'wait_for_point'}],
-        //                 [{text: 'В конец', callback_data: 'wait_for_accept'}]
-        //             ]
-        //         }),
-        //         parse_mode: 'Markdown'
-        //     });
-        // } else {
-        //     try {
-        //         menu = await gsrun(client, 'Лист2!B2:B');
-        //     } catch (e) {
-        //         console.log(e);
-        //     }
-        //     let keyboard_model = fillInKeyboard(menu, 'targetObject', 'wait_for_point');
-        //     await bot.sendMessage(msg.chat.id, 'Выберите целевой объект\n', {
-        //         reply_markup: JSON.stringify({
-        //             inline_keyboard: keyboard_model
-        //         }),
-        //         parse_mode: 'Markdown'
-        //     });
-        //     // await bot.sendMessage(msg.chat.id, 'Выбрана ' + valueOfPointRus + '\n', {
-        //     //     reply_markup: JSON.stringify({
-        //     //         inline_keyboard: [
-        //     //             [{text: 'Выбор целевого объекта', callback_data: 'wait_for_target_object'}],
-        //     //             [{text: 'Назад', callback_data: 'wait_for_point'}]
-        //     //         ]
-        //     //     }),
-        //     //     parse_mode: 'Markdown'
-        //     // });
-        // }
-    // } else if (action === 'wait_for_target_object'){
-    //     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-    //     if (dialog){
-    //         dialog.state = DialogesStates.waitForTargetObject;
-    //     }else dialoges.push({
-    //         chatId: msg.chat.id,
-    //         state: DialogesStates.waitForTargetObject,
-    //         extra: null
-    //     });
-    //     console.log(dialoges);
-    //     try {
-    //         menu = await gsrun(client, 'Лист2!B2:B');
-    //     } catch (e) {
-    //         console.log(e);
-    //     }
-    //     let keyboard_model = fillInKeyboard(menu, 'targetObject', 'wait_for_point');
-    //     await bot.sendMessage(msg.chat.id, 'Выберите целевой объект\n', {
-    //         reply_markup: JSON.stringify({
-    //             inline_keyboard: keyboard_model
-    //         }),
-    //         parse_mode: 'Markdown'
-    //     });
-    // }
     else if(action.match(/targetObject\d/)){
         try {
-            menu = await gsrun(client, `${config.listNameMenu}!B2:B`);
+            menu = await gsrun(clientLib.client, `${config.listMenu}!B2:B`);
         } catch (e) {
             console.log(e);
         }
@@ -448,7 +417,7 @@ async function actionHandler(action, msg) {
         let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
         if ( menu[finalObject] === 'Аппараты'){
             try {
-                menu = await gsrun(client, 'Лист2!C2:C');
+                menu = await gsrun(clientLib.client, `${config.listMenu}!C2:C`);
             } catch (e) {
                 console.log(e);
             }
@@ -483,82 +452,10 @@ async function actionHandler(action, msg) {
                 });
             }
         }
-        // if (endpoint === true){
-        //     if ( menu[finalObject] === 'Аппараты'){
-        //         await bot.sendMessage(msg.chat.id, 'Выбрано ' + menu[finalObject] + '\n', {
-        //             reply_markup: JSON.stringify({
-        //                 inline_keyboard: [
-        //                     [{text: 'Выбрать модель: ', callback_data: 'wait_apparat_options'}],
-        //                     [{text: 'Назад', callback_data: 'wait_for_target_object'}],
-        //                     [{text: 'В конец', callback_data: 'wait_for_accept'}]
-        //                 ]
-        //             }),
-        //             parse_mode: 'Markdown'
-        //         });
-        //     } else {
-        //         await bot.sendMessage(msg.chat.id, 'Выбрано ' + menu[finalObject] + '\n', {
-        //             reply_markup: JSON.stringify({
-        //                 inline_keyboard: [
-        //                     [{text: 'Ввести количество: ', callback_data: 'wait_for_number_apparat'}],
-        //                     [{text: 'Назад', callback_data: 'wait_for_target_object'}],
-        //                     [{text: 'В конец', callback_data: 'wait_for_accept'}]
-        //                 ]
-        //             }),
-        //             parse_mode: 'Markdown'
-        //         });
-        //     }
-        // } else {
-        //     if ( menu[finalObject] === 'Аппараты'){
-        //         await bot.sendMessage(msg.chat.id, 'Выбрано ' + menu[finalObject] + '\n', {
-        //             reply_markup: JSON.stringify({
-        //                 inline_keyboard: [
-        //                     [{text: 'Выбрать модель: ', callback_data: 'wait_apparat_options'}],
-        //                     [{text: 'Назад', callback_data: 'wait_for_target_object'}],
-        //                 ]
-        //             }),
-        //             parse_mode: 'Markdown'
-        //         });
-        //     } else {
-        //         await bot.sendMessage(msg.chat.id, 'Выбрано ' + menu[finalObject] + '\n', {
-        //             reply_markup: JSON.stringify({
-        //                 inline_keyboard: [
-        //                     [{text: 'Ввести количество: ', callback_data: 'wait_for_number_apparat'}],
-        //                     [{text: 'Назад', callback_data: 'wait_for_target_object'}]
-        //                 ]
-        //             }),
-        //             parse_mode: 'Markdown'
-        //         });
-        //     }
-        // }
     }
-    // else if (action === 'wait_apparat_options'){
-    //     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-    //     if (dialog){
-    //         dialog.state = DialogesStates.waitForApparatOptions;
-    //     }
-    //     else dialoges.push({
-    //         chatId: msg.chat.id,
-    //         state: DialogesStates.waitForApparatOptions,
-    //         extra: null
-    //     });
-    //
-    //     console.log(dialoges);
-    //     try {
-    //         menu = await gsrun(client, 'Лист2!C2:C');
-    //     } catch (e) {
-    //         console.log(e);
-    //     }
-    //     let keyboard_model = fillInKeyboard(menu, 'modelValue', 'wait_for_target_object');
-    //     await bot.sendMessage(msg.chat.id, 'Выберите модель\n', {
-    //         reply_markup: JSON.stringify({
-    //             inline_keyboard: keyboard_model
-    //         }),
-    //         parse_mode: 'Markdown'
-    //     });
-    // }
     else if( action.match(/modelValue\d/)){
         try {
-            menu = await gsrun(client, `${config.listNameMenu}!C2:C`);
+            menu = await gsrun(clientLib.client, `${config.listMenu}!C2:C`);
         } catch (e) {
             console.log(e);
         }
@@ -601,48 +498,7 @@ async function actionHandler(action, msg) {
             });
         }
     }else if (action === 'wait_for_number_apparat') {
-        await bot.sendMessage(msg.chat.id, 'Введите количество(без посторонних символов или знаков): ');
-        bot.onText(/^\d+$/, (msg, match) => {
-            let valueOfNumber = msg.text;
-            console.log(valueOfNumber);
-            const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-            if (dialog){
-                dialog.state = DialogesStates.waitForNumberOfApparat;
-                dialog.numberOfApparat = valueOfNumber;
-            }
-            else dialoges.push({
-                chatId: msg.chat.id,
-                state: DialogesStates.waitForNumberOfApparat,
-                numberOfApparat: valueOfNumber,
-                extra: null
-            });
-            console.log(dialoges);
-            let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
-            if (endpoint === true){
-                bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-                    reply_markup: JSON.stringify({
-                        inline_keyboard: [
-                            [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-                            [{text: 'Назад', callback_data: 'farm' + farmNumber }],
-                            [{text: 'В конец', callback_data: 'wait_for_accept'}]
-                        ]
-                    }),
-                    parse_mode: 'Markdown'
-                });
-                delete msg.text;
-            } else {
-                bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-                    reply_markup: JSON.stringify({
-                        inline_keyboard: [
-                            [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-                            [{text: 'Назад', callback_data: 'farm' + farmNumber }]
-                        ]
-                    }),
-                    parse_mode: 'Markdown'
-                });
-                delete msg.text;
-            }
-        });
+        await bot.sendMessage(msg.chat.id, 'Введите количество(без посторонних символов или знаков), используя команду "/count": ');
         delete msg.text;
     } else if (action === 'wait_for_responsible_for_shipment'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -655,7 +511,7 @@ async function actionHandler(action, msg) {
         });
         console.log(dialoges);
         try {
-            menu = await gsrun(client, `${config.listNameMenu}!D2:D`);
+            menu = await gsrun(clientLib.client, `${config.listMenu}!D2:D`);
         } catch (e) {
             console.log(e);
         }
@@ -667,20 +523,19 @@ async function actionHandler(action, msg) {
             }),
             parse_mode: 'Markdown'
         });
-    } else if(action.match(/responsibleShipment\d/)){
+    } else if(action.match(/responsibleShipment\d/)) {
         try {
-            menu = await gsrun(client, 'Лист2!D2:D');
+            menu = await gsrun(clientLib.client, `${config.listMenu}!D2:D`);
         } catch (e) {
             console.log(e);
         }
         let finalObject = action.slice(action.length - 1) - 1; //получение последней цифры в TargetObject
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-        if (dialog){
+        if (dialog) {
             dialog.state = DialogesStates.waitForResponsibleForShipment;
             dialog.responsibleForShipment = menu[finalObject];
             dialog.extraShip = finalObject;
-        }
-        else dialoges.push({
+        } else dialoges.push({
             chatId: msg.chat.id,
             state: DialogesStates.waitForResponsibleForShipment,
             responsibleForShipment: menu[finalObject],
@@ -689,7 +544,7 @@ async function actionHandler(action, msg) {
         });
         console.log(dialoges);
         try {
-            menu = await gsrun(client, `${config.listNameMenu}!E2:E`);
+            menu = await gsrun(clientLib.client, `${config.listMenu}!E2:E`);
         } catch (e) {
             console.log(e);
         }
@@ -701,42 +556,10 @@ async function actionHandler(action, msg) {
             }),
             parse_mode: 'Markdown'
         });
-        // await bot.sendMessage(msg.chat.id, 'Выбран: ' + menu[finalObject] + '\n', {
-        //     reply_markup: JSON.stringify({
-        //         inline_keyboard: [
-        //             [{text: 'Выберите ответственного за доставку', callback_data: 'wait_for_responsible_for_delivery'}],
-        //             [{text: 'Назад', callback_data: 'wait_for_responsible_for_shipment'}]
-        //         ]
-        //     }),
-        //     parse_mode: 'Markdown'
-        // });
     }
-    // else if (action === 'wait_for_responsible_for_delivery') {
-    //     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-    //     if (dialog) {
-    //         dialog.state = DialogesStates.waitForResponsibleForDelivery;
-    //     } else dialoges.push({
-    //         chatId: msg.chat.id,
-    //         state: DialogesStates.waitForResponsibleForDelivery,
-    //         extra: null
-    //     });
-    //     console.log(dialoges);
-    //     try {
-    //         menu = await gsrun(client, 'Лист2!E2:E');
-    //     } catch (e) {
-    //         console.log(e);
-    //     }
-    //     let keyboard_model = fillInKeyboard(menu, 'responsibleDelivery', 'wait_for_responsible_for_shipment');
-    //     await bot.sendMessage(msg.chat.id, 'Выберите ответственного за доставку\n', {
-    //         reply_markup: JSON.stringify({
-    //             inline_keyboard: keyboard_model
-    //         }),
-    //         parse_mode: 'Markdown'
-    //     });
-    // }
     else if(action.match(/responsibleDelivery\d/)) {
         try {
-            menu = await gsrun(client, 'Лист2!E2:E');
+            menu = await gsrun(clientLib.client, `${config.listMenu}!E2:E`);
         } catch (e) {
             console.log(e);
         }
@@ -778,47 +601,7 @@ async function actionHandler(action, msg) {
             });
         }
     } else if (action === 'waitForComment'){
-        await bot.sendMessage(msg.chat.id, 'Оставить комментарий: \n');
-        bot.onText(/(.+)/, (msg) => {
-            if ( (msg.text.match(/(.+)__Отгрузка__/)) || (msg.text.match(/(.+)__Прием__/))) return;
-            let commentValue = msg.text;
-            const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-            if (dialog){
-                dialog.state = DialogesStates.waitForComment;
-                dialog.comment = commentValue;
-            }
-            else dialoges.push({
-                chatId: msg.chat.id,
-                state: DialogesStates.waitForComment,
-                numberOfApparat: commentValue,
-                extra: null
-            });
-            console.log(dialoges);
-            if (endpoint === true){
-                bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
-                    reply_markup: JSON.stringify({
-                        inline_keyboard: [
-                            [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
-                            [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
-                            [{text: 'В конец', callback_data: 'wait_for_accept'}]
-                        ]
-                    }),
-                    parse_mode: 'Markdown'
-                });
-                delete msg.text;
-            } else {
-                bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
-                    reply_markup: JSON.stringify({
-                        inline_keyboard: [
-                            [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
-                            [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
-                        ]
-                    }),
-                    parse_mode: 'Markdown'
-                });
-                delete msg.text;
-            }
-        });
+        await bot.sendMessage(msg.chat.id, 'Чтобы оставить комментарий воспользуйтесь пожалуйста командой "/comment": \n');
         delete msg.text;
     }else if (action === 'wait_for_accept'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -831,26 +614,46 @@ async function actionHandler(action, msg) {
         });
         console.log(dialoges);
         if (dialog.comment === undefined ) dialog.comment = 'Отсутствует';
-        if (dialog.modelValue === undefined ) dialog.modelValue = ' - ';
-        await bot.sendMessage(msg.chat.id,
-            emoji.game_die + 'Состояние: *' + (dialog.value).slice(2, -2) + '*\n' +
-            emoji.bank + 'Ферма: *' + dialog.valueOfPoint + '*\n' +
-            emoji.bookmark + 'Наименование: *' + dialog.targetObject + '*\n' +
-            emoji.gear + 'Количество: *' + dialog.numberOfApparat + '*\n' +
-            emoji.package + 'Модель: *' + dialog.modelValue + '*\n' +
-            emoji.outbox_tray + 'Ответственный за отгрузку: *' + dialog.responsibleForShipment  + '*\n' +
-            emoji.inbox_tray + 'Ответственный за перевозку: *' + dialog.responsibleForDelivery + '*\n' +
-            emoji.page_facing_up + 'Комментарий: *' + dialog.comment + '*\n' +
-            'Подтвердите данные:\n', {
-                reply_markup: JSON.stringify({
-                    inline_keyboard: [
-                        [{text: 'Да', callback_data: 'confirmed'}],
-                        [{text: 'Нет', callback_data: 'unconfirmed'}],
-                    ]
-                }),
-                parse_mode: 'Markdown'
-            }
-        );
+        if (dialog.modelValue === undefined ){
+            await bot.sendMessage(msg.chat.id,
+                emoji.game_die + 'Состояние: *' + (dialog.value).slice(2, -2) + '*\n' +
+                emoji.bank + 'Ферма: *' + dialog.valueOfPoint + '*\n' +
+                emoji.bookmark + 'Наименование: *' + dialog.targetObject + '*\n' +
+                emoji.gear + 'Количество: *' + dialog.numberOfApparat + '*\n' +
+                emoji.outbox_tray + 'Ответственный за отгрузку: *' + dialog.responsibleForShipment  + '*\n' +
+                emoji.inbox_tray + 'Ответственный за перевозку: *' + dialog.responsibleForDelivery + '*\n' +
+                emoji.page_facing_up + 'Комментарий: *' + dialog.comment + '*\n' +
+                'Подтвердите данные:\n', {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [
+                            [{text: 'Да', callback_data: 'confirmed'}],
+                            [{text: 'Нет', callback_data: 'unconfirmed'}],
+                        ]
+                    }),
+                    parse_mode: 'Markdown'
+                }
+            );
+        } else {
+            await bot.sendMessage(msg.chat.id,
+                emoji.game_die + 'Состояние: *' + (dialog.value).slice(2, -2) + '*\n' +
+                emoji.bank + 'Ферма: *' + dialog.valueOfPoint + '*\n' +
+                emoji.bookmark + 'Наименование: *' + dialog.targetObject + '*\n' +
+                emoji.gear + 'Количество: *' + dialog.numberOfApparat + '*\n' +
+                emoji.package + 'Модель: *' + dialog.modelValue + '*\n' +
+                emoji.outbox_tray + 'Ответственный за отгрузку: *' + dialog.responsibleForShipment  + '*\n' +
+                emoji.inbox_tray + 'Ответственный за перевозку: *' + dialog.responsibleForDelivery + '*\n' +
+                emoji.page_facing_up + 'Комментарий: *' + dialog.comment + '*\n' +
+                'Подтвердите данные:\n', {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [
+                            [{text: 'Да', callback_data: 'confirmed'}],
+                            [{text: 'Нет', callback_data: 'unconfirmed'}],
+                        ]
+                    }),
+                    parse_mode: 'Markdown'
+                }
+            );
+        }
     } else if ( action === 'unconfirmed'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
         if (dialog) {
@@ -867,31 +670,56 @@ async function actionHandler(action, msg) {
         if ( dialog.value === '__Отгрузка__') choseNumber = 1;
         else choseNumber = 0;
         let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
-
-        await bot.sendMessage(msg.chat.id, '\nПодтвердите данные:\n', {
-            reply_markup: JSON.stringify({
-                inline_keyboard: [
-                    [{text: 'Тип: ' + dialog.value, callback_data: 'reset'}],
-                    [{text: 'Ферма: ' + dialog.valueOfPoint, callback_data: 'makechose' + choseNumber }],
-                    [{text: 'Наименование: ' + dialog.targetObject, callback_data: 'farm' + farmNumber }],
-                    [{text: 'Количество: ' + dialog.numberOfApparat, callback_data: 'wait_for_number_apparat'}],
-                    [{text: 'Модель: ' + dialog.modelValue, callback_data: 'modelValue' + dialog.extraModel }],
-                    [{
-                        text: 'Ответственный за отгрузку: ' + dialog.responsibleForShipment,
-                        callback_data: 'wait_for_responsible_for_shipment'
-                    }],
-                    [{
-                        text: 'Ответственный за перевозку: ' + dialog.responsibleForDelivery,
-                        callback_data: 'responsibleShipment' + dialog.extraShip
-                    }],
-                    [{
-                        text: 'Комментарий: ' + dialog.comment,
-                        callback_data: 'wait_for_comment'
-                    }],
-                ]
-            }),
-            parse_mode: 'Markdown'
-        });
+        if ( dialog.modelValue === undefined ){
+            await bot.sendMessage(msg.chat.id, '\nПодтвердите данные:\n', {
+                reply_markup: JSON.stringify({
+                    inline_keyboard: [
+                        [{text: 'Тип: ' + dialog.value, callback_data: 'reset'}],
+                        [{text: 'Ферма: ' + dialog.valueOfPoint, callback_data: 'makechose' + choseNumber }],
+                        [{text: 'Наименование: ' + dialog.targetObject, callback_data: 'farm' + farmNumber }],
+                        [{text: 'Количество: ' + dialog.numberOfApparat, callback_data: 'wait_for_number_apparat'}],
+                        [{text: 'Модель: ' + dialog.modelValue, callback_data: 'modelValue' + dialog.extraModel }],
+                        [{
+                            text: 'Ответственный за отгрузку: ' + dialog.responsibleForShipment,
+                            callback_data: 'wait_for_responsible_for_shipment'
+                        }],
+                        [{
+                            text: 'Ответственный за перевозку: ' + dialog.responsibleForDelivery,
+                            callback_data: 'responsibleShipment' + dialog.extraShip
+                        }],
+                        [{
+                            text: 'Комментарий: ' + dialog.comment,
+                            callback_data: 'wait_for_comment'
+                        }],
+                    ]
+                }),
+                parse_mode: 'Markdown'
+            });
+        } else {
+            await bot.sendMessage(msg.chat.id, '\nПодтвердите данные:\n', {
+                reply_markup: JSON.stringify({
+                    inline_keyboard: [
+                        [{text: 'Тип: ' + dialog.value, callback_data: 'reset'}],
+                        [{text: 'Ферма: ' + dialog.valueOfPoint, callback_data: 'makechose' + choseNumber }],
+                        [{text: 'Наименование: ' + dialog.targetObject, callback_data: 'farm' + farmNumber }],
+                        [{text: 'Количество: ' + dialog.numberOfApparat, callback_data: 'wait_for_number_apparat'}],
+                        [{
+                            text: 'Ответственный за отгрузку: ' + dialog.responsibleForShipment,
+                            callback_data: 'wait_for_responsible_for_shipment'
+                        }],
+                        [{
+                            text: 'Ответственный за перевозку: ' + dialog.responsibleForDelivery,
+                            callback_data: 'responsibleShipment' + dialog.extraShip
+                        }],
+                        [{
+                            text: 'Комментарий: ' + dialog.comment,
+                            callback_data: 'wait_for_comment'
+                        }],
+                    ]
+                }),
+                parse_mode: 'Markdown'
+            });
+        }
     } else if (action === 'confirmed'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
 
@@ -908,7 +736,7 @@ async function actionHandler(action, msg) {
                 range: `${config.listName}!A${lastRow}:J${lastRow}`,
                 valueInputOption: 'USER_ENTERED',
                 resource: {
-                    values: [[ date, dateTime, (dialog.value).slice(2, -2), dialog.valueOfPoint, dialog.targetObject, dialog.numberOfApparat, dialog.modelValue, dialog.responsibleForShipment, dialog.responsibleForDelivery, dialog.comment ]],
+                    values: [[ dateLib.date, dateLib.dateTime, (dialog.value).slice(2, -2), dialog.valueOfPoint, dialog.targetObject, dialog.numberOfApparat, dialog.modelValue, dialog.responsibleForShipment, dialog.responsibleForDelivery, dialog.comment ]],
                 }
             };
             let data = await gsapi.spreadsheets.values.update(updateOptions);
@@ -921,62 +749,8 @@ async function actionHandler(action, msg) {
                 await actionHandler('unconfirmed', msg.chat.id);
             }
         }
-        gsrun_final(client, true);
+        gsrun_final(clientLib.client);
     } else if (action === 'reset') {
-        await listServices(msg.chat.id);
+        await listServices(msg.chat.id, true);
     }
 }
-
-
-
-// if ( match ){
-//     let valueOfNumber = msg.text;
-//     console.log(valueOfNumber);
-//     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-//     if (dialog){
-//         dialog.state = DialogesStates.waitForNumberOfApparat;
-//         dialog.numberOfApparat = valueOfNumber;
-//     }
-//     else dialoges.push({
-//         chatId: msg.chat.id,
-//         state: DialogesStates.waitForNumberOfApparat,
-//         numberOfApparat: valueOfNumber,
-//         extra: null
-//     });
-//     console.log(dialoges);
-//     if (endpoint === true){
-//         bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-//             reply_markup: JSON.stringify({
-//                 inline_keyboard: [
-//                     [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-//                     [{text: 'Назад', callback_data: 'wait_for_target_object'}],
-//                     [{text: 'В конец', callback_data: 'wait_for_accept'}]
-//                 ]
-//             }),
-//             parse_mode: 'Markdown'
-//         });
-//         delete msg.text;
-//     } else {
-//         bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-//             reply_markup: JSON.stringify({
-//                 inline_keyboard: [
-//                     [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-//                     [{text: 'Назад', callback_data: 'wait_for_target_object'}]
-//                 ]
-//             }),
-//             parse_mode: 'Markdown'
-//         });
-//         delete msg.text;
-//     }
-// } else {
-//     bot.sendMessage(msg.chat.id, 'Введите только цифры без других вспомогательных символов.', {
-//         reply_markup: JSON.stringify({
-//             inline_keyboard: [
-//                 [{text: 'Ввести еще раз', callback_data: 'wait_for_number_apparat'}],
-//                 [{text: 'Назад', callback_data: 'wait_for_target_object'}]
-//             ]
-//         }),
-//         parse_mode: 'Markdown'
-//     });
-//     delete msg.text;
-// }
