@@ -242,88 +242,6 @@ bot.onText(/^[^/].+/, async (msg) => {
     else if (msg.text === ServiceList.reception) await actionHandler('makechose2', msg);
 });
 
-bot.onText(/^\d+$/, (msg) => {
-    let valueOfNumber = (msg.text).replace(/\s*/, '');
-    console.log(valueOfNumber);
-    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-    if (dialog){
-        dialog.state = DialogesStates.waitForNumberOfApparat;
-        dialog.numberOfApparat = valueOfNumber;
-    }
-    else dialoges.push({
-        chatId: msg.chat.id,
-        state: DialogesStates.waitForNumberOfApparat,
-        numberOfApparat: valueOfNumber,
-        extra: null
-    });
-    console.log(dialoges);
-    let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
-    if (endpoint === true){
-        bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-            reply_markup: JSON.stringify({
-                inline_keyboard: [
-                    [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-                    [{text: 'Назад', callback_data: 'farm' + farmNumber }],
-                    [{text: 'В конец', callback_data: 'wait_for_accept'}]
-                ]
-            }),
-            parse_mode: 'Markdown'
-        });
-        delete msg.text;
-    } else {
-        bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-            reply_markup: JSON.stringify({
-                inline_keyboard: [
-                    [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-                    [{text: 'Назад', callback_data: 'farm' + farmNumber }]
-                ]
-            }),
-            parse_mode: 'Markdown'
-        });
-        delete msg.text;
-    }
-});
-
-bot.onText(/(.+)/, (msg) => {
-    let commentValue = (msg.text).replace('/comment ', '');
-    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-    if (dialog){
-        dialog.state = DialogesStates.waitForComment;
-        dialog.comment = commentValue;
-    }
-    else dialoges.push({
-        chatId: msg.chat.id,
-        state: DialogesStates.waitForComment,
-        numberOfApparat: commentValue,
-        extra: null
-    });
-    console.log(dialoges);
-    if (endpoint === true){
-        bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
-            reply_markup: JSON.stringify({
-                inline_keyboard: [
-                    [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
-                    [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
-                    [{text: 'В конец', callback_data: 'wait_for_accept'}]
-                ]
-            }),
-            parse_mode: 'Markdown'
-        });
-        delete msg.text;
-    } else {
-        bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
-            reply_markup: JSON.stringify({
-                inline_keyboard: [
-                    [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
-                    [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
-                ]
-            }),
-            parse_mode: 'Markdown'
-        });
-        delete msg.text;
-    }
-});
-
 async function actionHandler(action, msg) {
     delete msg.text;
     let menu;
@@ -499,6 +417,47 @@ async function actionHandler(action, msg) {
         }
     }else if (action === 'wait_for_number_apparat') {
         await bot.sendMessage(msg.chat.id, 'Введите количество(без посторонних символов или знаков): ');
+        bot.onText(/^\d+$/, (msg) => {
+            let valueOfNumber = (msg.text).replace(/\s*/, '');
+            console.log(valueOfNumber);
+            const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+            if (dialog){
+                dialog.state = DialogesStates.waitForNumberOfApparat;
+                dialog.numberOfApparat = valueOfNumber;
+            }
+            else dialoges.push({
+                chatId: msg.chat.id,
+                state: DialogesStates.waitForNumberOfApparat,
+                numberOfApparat: valueOfNumber,
+                extra: null
+            });
+            console.log(dialoges);
+            let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
+            if (endpoint === true){
+                bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [
+                            [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
+                            [{text: 'Назад', callback_data: 'farm' + farmNumber }],
+                            [{text: 'В конец', callback_data: 'wait_for_accept'}]
+                        ]
+                    }),
+                    parse_mode: 'Markdown'
+                });
+                delete msg.text;
+            } else {
+                bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [
+                            [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
+                            [{text: 'Назад', callback_data: 'farm' + farmNumber }]
+                        ]
+                    }),
+                    parse_mode: 'Markdown'
+                });
+                delete msg.text;
+            }
+        });
         delete msg.text;
     } else if (action === 'wait_for_responsible_for_shipment'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -602,6 +561,45 @@ async function actionHandler(action, msg) {
         }
     } else if (action === 'waitForComment'){
         await bot.sendMessage(msg.chat.id, 'Оставить комментарий: \n');
+        bot.onText(/(.+)/, (msg) => {
+            let commentValue = (msg.text).replace('/comment ', '');
+            const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+            if (dialog){
+                dialog.state = DialogesStates.waitForComment;
+                dialog.comment = commentValue;
+            }
+            else dialoges.push({
+                chatId: msg.chat.id,
+                state: DialogesStates.waitForComment,
+                numberOfApparat: commentValue,
+                extra: null
+            });
+            console.log(dialoges);
+            if (endpoint === true){
+                bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [
+                            [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
+                            [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
+                            [{text: 'В конец', callback_data: 'wait_for_accept'}]
+                        ]
+                    }),
+                    parse_mode: 'Markdown'
+                });
+                delete msg.text;
+            } else {
+                bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [
+                            [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
+                            [{text: 'Назад', callback_data: 'responsibleDelivery' + dialog.extraDel}],
+                        ]
+                    }),
+                    parse_mode: 'Markdown'
+                });
+                delete msg.text;
+            }
+        });
         delete msg.text;
     }else if (action === 'wait_for_accept'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
