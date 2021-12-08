@@ -242,8 +242,8 @@ bot.onText(/^[^/].+/, async (msg) => {
     else if (msg.text === ServiceList.reception) await actionHandler('makechose2', msg);
 });
 
-bot.onText(/\/count\s*(.+)/, (msg) => {
-    let valueOfNumber = (msg.text).replace('/count ', '');
+bot.onText(/^\d+$/, (msg) => {
+    let valueOfNumber = (msg.text).replace(/\s*/, '');
     console.log(valueOfNumber);
     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
     if (dialog){
@@ -284,7 +284,7 @@ bot.onText(/\/count\s*(.+)/, (msg) => {
     }
 });
 
-bot.onText(/\/comment\s*(.+)/, (msg) => {
+bot.onText(/(.+)/, (msg) => {
     let commentValue = (msg.text).replace('/comment ', '');
     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
     if (dialog){
@@ -498,7 +498,7 @@ async function actionHandler(action, msg) {
             });
         }
     }else if (action === 'wait_for_number_apparat') {
-        await bot.sendMessage(msg.chat.id, 'Введите количество(без посторонних символов или знаков), используя команду "/count": ');
+        await bot.sendMessage(msg.chat.id, 'Введите количество(без посторонних символов или знаков): ');
         delete msg.text;
     } else if (action === 'wait_for_responsible_for_shipment'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -601,7 +601,7 @@ async function actionHandler(action, msg) {
             });
         }
     } else if (action === 'waitForComment'){
-        await bot.sendMessage(msg.chat.id, 'Чтобы оставить комментарий воспользуйтесь пожалуйста командой "/comment": \n');
+        await bot.sendMessage(msg.chat.id, 'Оставить комментарий: \n');
         delete msg.text;
     }else if (action === 'wait_for_accept'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
