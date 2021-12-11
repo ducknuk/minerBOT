@@ -89,7 +89,7 @@ async function listServices(id, del){
             if (resultForArray[i] === id.toString()) {
                 console.log('true');
                 let promo = 'Выберите действие:';
-                if ( id.toString() === '252725776' ){
+                if ( (id.toString() === '252725776') || ( id.toString() === '414322435' ) || ( id.toString() === '5091996291' )){
                     await bot.sendMessage(id, promo, {
                         reply_markup: JSON.stringify({
                             keyboard: [
@@ -240,7 +240,6 @@ bot.onText(/\/pass\s*(.+)/, async (msg, match) => {
             range: `${config.listRegister}!B1:B`
         };
         let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
-        console.log(lastRowData.data.values.length)
         let lastRow = lastRowData.data.values.length + 1;
         const updateOptions = {
             spreadsheetId: config.spreadsheetId,
@@ -265,46 +264,49 @@ bot.onText(/\/pass\s*(.+)/, async (msg, match) => {
         await registerUer(clientLib.client, dialog.FIO, pass);
         return;
     }
-    const getAllData = {
-        spreadsheetId: config.spreadsheetId,
-        range: `${config.listRegister}!B2:C` //get all data
-    };
-    let data = await gsapi.spreadsheets.values.get(getAllData);
-    let result = data.data.values;
-    console.log(result);
-    if (!result) {
+
+    if ( dialog.state === 'auth_wait_for_FIO' ){
+        const getAllData = {
+            spreadsheetId: config.spreadsheetId,
+            range: `${config.listRegister}!B2:C` //get all data
+        };
+        let data = await gsapi.spreadsheets.values.get(getAllData);
+        let result = data.data.values;
+        console.log(result);
+        if (!result) {
+            await bot.sendMessage(msg.chat.id, 'Ваши данные в базе данных не найдены, пожалуйста обратитесь к администратору.');
+            await listServices(msg.chat.id, true);
+        }
+
+        async function inputUserID(count) {
+            const authUserTrue = {
+                spreadsheetId: config.spreadsheetId,
+                range: `${config.listRegister}!A${count + 2}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: {
+                    values: [[ msg.chat.id ]],
+                }
+            };
+            let authData = await gsapi.spreadsheets.values.update(authUserTrue);
+            if ( (authData.status === 200)){
+                await bot.sendMessage(msg.chat.id, 'Вы успешно авторизовались в системе бота.');
+            } else {
+                await bot.sendMessage(msg.chat.id, "Не удалось авторизоваться, попробуйте позже или обратитесь за помощью к администратору.");
+            }
+        }
+
+        for (let i = 0; i < result.length; i++) {
+            for (let j = 0; j < 2; j++){
+                if ( (result[i][0] === dialog.FIO ) && (result[i][1] === pass.toString() ) ){
+                    await inputUserID(i);
+                    await listServices(msg.chat.id, true);
+                    return;
+                }
+            }
+        }
         await bot.sendMessage(msg.chat.id, 'Ваши данные в базе данных не найдены, пожалуйста обратитесь к администратору.');
         await listServices(msg.chat.id, true);
     }
-
-    async function inputUserID(count) {
-        const authUserTrue = {
-            spreadsheetId: config.spreadsheetId,
-            range: `${config.listRegister}!A${count + 2}`,
-            valueInputOption: 'USER_ENTERED',
-            resource: {
-                values: [[ msg.chat.id ]],
-            }
-        };
-        let authData = await gsapi.spreadsheets.values.update(authUserTrue);
-        if ( (authData.status === 200)){
-            await bot.sendMessage(msg.chat.id, 'Вы успешно авторизовались в системе бота.');
-        } else {
-            await bot.sendMessage(msg.chat.id, "Не удалось авторизоваться, попробуйте позже или обратитесь за помощью к администратору.");
-        }
-    }
-
-    for (let i = 0; i < result.length; i++) {
-        for (let j = 0; j < 2; j++){
-            if ( (result[i][0] === dialog.FIO ) && (result[i][1] === pass.toString() ) ){
-                await inputUserID(i);
-                await listServices(msg.chat.id, true);
-                return;
-            }
-        }
-    }
-    await bot.sendMessage(msg.chat.id, 'Ваши данные в базе данных не найдены, пожалуйста обратитесь к администратору.');
-    await listServices(msg.chat.id, true);
 
 });
 
@@ -363,6 +365,15 @@ async function actionHandler(action, msg) {
     if ( action === 'authentication' ){
         await bot.sendMessage(msg.chat.id, 'Введите свое ФИО, как вам дал администратор используя команду "/name ".');
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+        if (dialog){
+            dialog.state = 'auth_wait_for_FIO';
+        }
+        else dialoges.push({
+            chatId: msg.chat.id,
+            state: 'auth_wait_for_FIO',
+            extra: null
+        });
+        console.log(dialoges);
     }
     else if( action === 'pass' ){
         await bot.sendMessage(msg.chat.id, 'Введите пароль, который вам дал администратор, используя команду "/pass ": ');
