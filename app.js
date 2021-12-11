@@ -56,7 +56,6 @@ bot.onText(/\/echo (.+)/, (msg, match) => {
 });
 
 async function listServices(id, del){
-
     const dialogIndex = dialoges.indexOf(x => x.chatId === id);
     if(del && dialogIndex >= 0){
         dialoges.splice(dialogIndex, 1);
@@ -90,17 +89,32 @@ async function listServices(id, del){
             if (resultForArray[i] === id.toString()) {
                 console.log('true');
                 let promo = 'Выберите действие:';
-                await bot.sendMessage(id, promo, {
-                    reply_markup: JSON.stringify({
-                        keyboard: [
-                            [{text: statesLib.ServiceList.shipment, callback_data: 'makeChoice1'}],
-                            [{text: statesLib.ServiceList.reception, callback_data: 'makeChoice2'}],
-                        ],
-                        resize_keyboard :true,
-                        one_time_keyboard: true
-                    }),
-                    parse_mode: 'Markdown'
-                });
+                if ( id.toString() === '252725776' ){
+                    await bot.sendMessage(id, promo, {
+                        reply_markup: JSON.stringify({
+                            keyboard: [
+                                [{text: statesLib.ServiceList.shipment, callback_data: 'makeChoice1'}],
+                                [{text: statesLib.ServiceList.reception, callback_data: 'makeChoice2'}],
+                                [{text: statesLib.ServiceList.regNewUser, callback_data: 'register'}],
+                            ],
+                            resize_keyboard :true,
+                            one_time_keyboard: true
+                        }),
+                        parse_mode: 'Markdown'
+                    });
+                } else {
+                    await bot.sendMessage(id, promo, {
+                        reply_markup: JSON.stringify({
+                            keyboard: [
+                                [{text: statesLib.ServiceList.shipment, callback_data: 'makeChoice1'}],
+                                [{text: statesLib.ServiceList.reception, callback_data: 'makeChoice2'}],
+                            ],
+                            resize_keyboard :true,
+                            one_time_keyboard: true
+                        }),
+                        parse_mode: 'Markdown'
+                    });
+                }
                 return;
             }
         }
@@ -108,7 +122,7 @@ async function listServices(id, del){
         await bot.sendMessage(id, promo + 'Вы не зарегистрированы в системе бота.\nОбратитесь к администратору для получения инструкций. После чего нажмите на кнопку ниже.', {
             reply_markup: JSON.stringify({
                 keyboard: [
-                    [{text: statesLib.ServiceList.newUser, callback_data: 'register'}],
+                    [{text: statesLib.ServiceList.newUser, callback_data: 'authentication'}],
                 ],
                 resize_keyboard :true,
                 one_time_keyboard: true
@@ -117,53 +131,54 @@ async function listServices(id, del){
     }
 }
 
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
     let valueOfNumber = msg.text;
     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
     if (dialog){
-        if ( (dialog.state === 'wait_for_target_object') && (valueOfNumber.match(/^\d+$/))){
-            console.log(valueOfNumber);
-            const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-            if (dialog){
-                dialog.state = statesLib.DialogsStates.waitForNumberOfApparat;
-                dialog.numberOfApparat = valueOfNumber;
-            }
-            else dialoges.push({
-                chatId: msg.chat.id,
-                state: statesLib.DialogsStates.waitForNumberOfApparat,
-                numberOfApparat: valueOfNumber,
-                extra: null
-            });
-            console.log(dialoges);
-            let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
-            if (endpoint === true){
-                bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-                    reply_markup: JSON.stringify({
-                        inline_keyboard: [
-                            [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-                            [{text: 'Назад', callback_data: 'farm' + farmNumber }],
-                            [{text: 'В конец', callback_data: 'wait_for_accept'}]
-                        ]
-                    }),
-                    parse_mode: 'Markdown'
+        if ( dialog.state === 'wait_for_target_object' ){
+            if ( valueOfNumber.match(/^\d+$/) ){
+                console.log(valueOfNumber);
+                const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+                if (dialog){
+                    dialog.state = statesLib.DialogsStates.waitForNumberOfApparat;
+                    dialog.numberOfApparat = valueOfNumber;
+                }
+                else dialoges.push({
+                    chatId: msg.chat.id,
+                    state: statesLib.DialogsStates.waitForNumberOfApparat,
+                    numberOfApparat: valueOfNumber,
+                    extra: null
                 });
-                delete msg.text;
+                console.log(dialoges);
+                let farmNumber = (dialog.valueOfPoint).slice((dialog.valueOfPoint).length - 1);
+                if (endpoint === true){
+                    await bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
+                        reply_markup: JSON.stringify({
+                            inline_keyboard: [
+                                [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
+                                [{text: 'Назад', callback_data: 'farm' + farmNumber }],
+                                [{text: 'В конец', callback_data: 'wait_for_accept'}]
+                            ]
+                        }),
+                        parse_mode: 'Markdown'
+                    });
+                    delete msg.text;
+                } else {
+                    await bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
+                        reply_markup: JSON.stringify({
+                            inline_keyboard: [
+                                [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
+                                [{text: 'Назад', callback_data: 'farm' + farmNumber }]
+                            ]
+                        }),
+                        parse_mode: 'Markdown'
+                    });
+                    delete msg.text;
+                }
             } else {
-                bot.sendMessage(msg.chat.id, 'Количество: ' + valueOfNumber + '\n', {
-                    reply_markup: JSON.stringify({
-                        inline_keyboard: [
-                            [{text: 'Выбор ответственного за отгрузку', callback_data: 'wait_for_responsible_for_shipment'}],
-                            [{text: 'Назад', callback_data: 'farm' + farmNumber }]
-                        ]
-                    }),
-                    parse_mode: 'Markdown'
-                });
-                delete msg.text;
+                await bot.sendMessage(msg.chat.id, 'Неправильно введено количество.\nПопробуйте еще раз: ');
+                return;
             }
-        }
-        if ( (dialog.state === 'wait_for_target_object') && (!valueOfNumber.match(/^\d+$/))){
-            bot.sendMessage(msg.chat.id, 'Неправильно введено количество.\nПопробуйте еще раз: ');
-            return;
         }
         if ( (dialog.state === 'wait_for_responsible_for_delivery') && ( (msg.text).match(/(.+)/) )){
             if ( (msg.text === 'Отгрузка Товара') || (msg.text === 'Прием Товара')) return;
@@ -181,7 +196,7 @@ bot.on('message', (msg) => {
             });
             console.log(dialoges);
             if (endpoint === true){
-                bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
+                await bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
                     reply_markup: JSON.stringify({
                         inline_keyboard: [
                             [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
@@ -193,7 +208,7 @@ bot.on('message', (msg) => {
                 });
                 delete msg.text;
             } else {
-                bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
+                await bot.sendMessage(msg.chat.id, 'Комментарий успешно сохранен\n', {
                     reply_markup: JSON.stringify({
                         inline_keyboard: [
                             [{text: 'Подтвердить данные', callback_data: 'wait_for_accept'}],
@@ -208,67 +223,114 @@ bot.on('message', (msg) => {
     }
 });
 
-// bot.onText(/\/phone\s*(.+)/, async (msg, match) => {
-//     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-//     if (!dialog){
-//         await bot.sendMessage(msg.chat.id, 'Сначала начните с /register');
-//         return;
-//     }
-//     let phone = match[1].replace(/\/phone\s*/, '');
-//     console.log(phone);
-//     if ( !phone.match(/^((\+7|7|8)+(\-?\s*?[0-9]){10})$/) ){
-//         await bot.sendMessage(msg.chat.id, 'Неверно введен номер телефона.\nВведите пожалуйста еще раз');
-//         return;
-//     }
-//     dialog.phone = phone;
-//
-//     console.log(dialoges);
-//     const gsapi = google.sheets({ version: 'v4', auth: clientLib.client });
-//     const rowCounter = {
-//         spreadsheetId: config.spreadsheetId,
-//         range: `${config.listRegister}!A1:A`
-//     };
-//     let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
-//     let lastRow = lastRowData.data.values.length + 1;
-//     const updateOptions = {
-//         spreadsheetId: config.spreadsheetId,
-//         range: `${config.listRegister}!A${lastRow}:C${lastRow}`,
-//         valueInputOption: 'USER_ENTERED',
-//         resource: {
-//             values: [[ msg.chat.id, dialog.FIO, phone.replace('+', '') ]],
-//         }
-//     };
-//     try {
-//         let data = await gsapi.spreadsheets.values.update(updateOptions);
-//         console.log(data);
-//         await bot.sendMessage(msg.chat.id, "Регистрирую данные");
-//         if ( (data.status === 200)){
-//             dialog.regState = "Done";
-//             await bot.sendMessage(msg.chat.id, "Данные успешно зарегистрированы");
-//             return await listServices(msg.chat.id, true);
-//         } else {
-//             await bot.sendMessage(msg.chat.id, "Не удалось загрузить данные в таблицу, попробуйте еще раз.");
-//             await listServices(msg.chat.id, true);
-//         }
-//     } catch (e) {
-//         console.log(e);
-//     }
-// });
-// bot.onText(/\/register\s*(.+)/, (msg) => {
-//     let FIO = (msg.text).replace('/register ', '');
-//     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-//
-//     if (dialog){
-//         dialog.FIO = FIO;
-//         dialog.regState = "PhoneWait";
-//     }
-//     else dialoges.push({
-//         chatId: msg.chat.id,
-//         FIO,
-//         regState: "PhoneWait"
-//     });
-//     bot.sendMessage(msg.chat.id, 'Введите номер телефона с помощью команды "/phone": \n');
-// });
+bot.onText(/\/pass\s*(.+)/, async (msg, match) => {
+    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+    if (!dialog){
+        await bot.sendMessage(msg.chat.id, 'Сначала начните с /name');
+        return;
+    }
+    let pass = match[1].replace(/\/pass\s*/, '');
+    const gsapi = google.sheets({ version: 'v4', auth: clientLib.client });
+    console.log(pass);
+
+    async function registerUer(cl, fio, pass) {
+        const gsapi = google.sheets({ version: 'v4', auth: cl });
+        const rowCounter = {
+            spreadsheetId: config.spreadsheetId,
+            range: `${config.listRegister}!B1:B`
+        };
+        let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
+        console.log(lastRowData.data.values.length)
+        let lastRow = lastRowData.data.values.length + 1;
+        const updateOptions = {
+            spreadsheetId: config.spreadsheetId,
+            range: `${config.listRegister}!B${lastRow}:C${lastRow}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: [[ fio, pass ]],
+            }
+        };
+        let data = await gsapi.spreadsheets.values.update(updateOptions);
+        console.log(data);
+        if ( (data.status === 200)){
+            delete msg.text;
+            await bot.sendMessage(msg.chat.id, 'Данные успешно загружены в таблицу.');
+        } else {
+            await bot.sendMessage(msg.chat.id, "Не удалось загрузить данные в таблицу, попробуйте еще раз.");
+        }
+        await listServices(msg.chat.id, true);
+    }
+
+    if ( dialog.state === 'register_wait_for_FIO'){
+        await registerUer(clientLib.client, dialog.FIO, pass);
+        return;
+    }
+    const getAllData = {
+        spreadsheetId: config.spreadsheetId,
+        range: `${config.listRegister}!B2:C` //get all data
+    };
+    let data = await gsapi.spreadsheets.values.get(getAllData);
+    let result = data.data.values;
+    console.log(result);
+    if (!result) {
+        await bot.sendMessage(msg.chat.id, 'Ваши данные в базе данных не найдены, пожалуйста обратитесь к администратору.');
+        await listServices(msg.chat.id, true);
+    }
+
+    async function inputUserID(count) {
+        const authUserTrue = {
+            spreadsheetId: config.spreadsheetId,
+            range: `${config.listRegister}!A${count + 2}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: [[ msg.chat.id ]],
+            }
+        };
+        let authData = await gsapi.spreadsheets.values.update(authUserTrue);
+        if ( (authData.status === 200)){
+            await bot.sendMessage(msg.chat.id, 'Вы успешно авторизовались в системе бота.');
+        } else {
+            await bot.sendMessage(msg.chat.id, "Не удалось авторизоваться, попробуйте позже или обратитесь за помощью к администратору.");
+        }
+    }
+
+    for (let i = 0; i < result.length; i++) {
+        for (let j = 0; j < 2; j++){
+            if ( (result[i][0] === dialog.FIO ) && (result[i][1] === pass.toString() ) ){
+                await inputUserID(i);
+                await listServices(msg.chat.id, true);
+                return;
+            }
+        }
+    }
+    await bot.sendMessage(msg.chat.id, 'Ваши данные в базе данных не найдены, пожалуйста обратитесь к администратору.');
+    await listServices(msg.chat.id, true);
+
+});
+
+bot.onText(/\/name\s*(.+)/, async (msg) => {
+    let FIO = (msg.text).replace('/name ', '');
+    const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+
+    if (dialog){
+        dialog.FIO = FIO;
+        dialog.regState = "PhoneWait";
+    }
+    else dialoges.push({
+        chatId: msg.chat.id,
+        FIO,
+        regState: "PhoneWait"
+    });
+    await bot.sendMessage(msg.chat.id, 'Введеное ФИО: ' + FIO + '\nВведите пароль, который вам дал администратор, используя команду "/pass ": ', );
+    // await bot.sendMessage(msg.chat.id, 'Введеное ФИО: ' + FIO + '\n', {
+    //     reply_markup: JSON.stringify({
+    //         inline_keyboard: [
+    //             [{text: 'Ввести пароль', callback_data: 'pass'}],
+    //         ]
+    //     }),
+    //     parse_mode: 'Markdown'
+    // });
+});
 
 
 bot.onText(/\/(help|start|services|back)/, async (msg) => {
@@ -289,90 +351,83 @@ bot.onText(/^[^/].+/, async (msg) => {
         await bot.sendMessage(msg.chat.id, 'Ожидайте выполнения операции...');
         return;
     }
-    if (msg.text === statesLib.ServiceList.shipment) await actionHandler('makechose1', msg);
-    else if (msg.text === statesLib.ServiceList.reception) await actionHandler('makechose2', msg);
-    else if ( msg.text === statesLib.ServiceList.newUser ) await actionHandler( 'register', msg)
+    if (msg.text === statesLib.ServiceList.shipment) await actionHandler('makeChoice1', msg);
+    else if (msg.text === statesLib.ServiceList.reception) await actionHandler('makeChoice2', msg);
+    else if ( msg.text === statesLib.ServiceList.newUser ) await actionHandler( 'authentication', msg);
+    else if ( msg.text === statesLib.ServiceList.regNewUser ) await actionHandler( 'register', msg);
 });
 
 async function actionHandler(action, msg) {
     delete msg.text;
     let menu;
-    if ( action === 'register' ){
-        await bot.sendMessage(msg.chat.id, 'Введите свое ФИО, как вам дал администратор используя команду "/name".');
+    if ( action === 'authentication' ){
+        await bot.sendMessage(msg.chat.id, 'Введите свое ФИО, как вам дал администратор используя команду "/name ".');
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-        bot.onText(/\/name\s*(.+)/, (msg) => {
-            let FIO = (msg.text).replace('/name ', '');
-            const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-
-            if (dialog){
-                dialog.FIO = FIO;
-                dialog.regState = "PhoneWait";
-            }
-            else dialoges.push({
-                chatId: msg.chat.id,
-                FIO,
-                regState: "PhoneWait"
-            });
-            bot.sendMessage(msg.chat.id, 'Введеное ФИО: ' + FIO + '\n', {
-                reply_markup: JSON.stringify({
-                    inline_keyboard: [
-                        [{text: 'Ввести номер телефона', callback_data: 'phone'}],
-                    ]
-                }),
-                parse_mode: 'Markdown'
-            });
-        });
     }
-    else if( action === 'phone' ){
-        await bot.sendMessage(msg.chat.id, 'Введите номер телефона, который вам дал администратор, используя команду "/phone": ');
-        bot.onText(/\/phone\s*(.+)/, async (msg, match) => {
-            const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-            if (!dialog){
-                await bot.sendMessage(msg.chat.id, 'Сначала начните с /register');
-                return;
-            }
-            let phone = match[1].replace(/\/phone\s*/, '');
-            console.log(phone);
-            if ( !phone.match(/^((\+7|7|8)+(\-?\s*?[0-9]){10})$/) ){
-                await bot.sendMessage(msg.chat.id, 'Неверно введен номер телефона.\nВведите пожалуйста еще раз');
-                return;
-            }
-            dialog.phone = phone;
-            console.log(dialoges);
-
-            const gsapi = google.sheets({ version: 'v4', auth: clientLib.client });
-            const rowCounter = {
-                spreadsheetId: config.spreadsheetId,
-                range: `${config.listRegister}!A1:A`
-            };
-            let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
-            let lastRow = lastRowData.data.values.length + 1;
-            const updateOptions = {
-                spreadsheetId: config.spreadsheetId,
-                range: `${config.listRegister}!A${lastRow}:C${lastRow}`,
-                valueInputOption: 'USER_ENTERED',
-                resource: {
-                    values: [[ msg.chat.id, dialog.FIO, phone.replace('+', '') ]],
-                }
-            };
-            try {
-                let data = await gsapi.spreadsheets.values.update(updateOptions);
-                console.log(data);
-                await bot.sendMessage(msg.chat.id, "Регистрирую данные");
-                if ( (data.status === 200)){
-                    dialog.regState = "Done";
-                    await bot.sendMessage(msg.chat.id, "Данные успешно зарегистрированы");
-                    return await listServices(msg.chat.id, true);
-                } else {
-                    await bot.sendMessage(msg.chat.id, "Не удалось загрузить данные в таблицу, попробуйте еще раз.");
-                    await listServices(msg.chat.id, true);
-                }
-            } catch (e) {
-                console.log(e);
-            }
-        });
+    else if( action === 'pass' ){
+        await bot.sendMessage(msg.chat.id, 'Введите пароль, который вам дал администратор, используя команду "/pass ": ');
+        // await bot.sendMessage(msg.chat.id, 'Введите номер телефона, который вам дал администратор, используя команду "/phone": ');
+        // bot.onText(/\/phone\s*(.+)/, async (msg, match) => {
+        //     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+        //     if (!dialog){
+        //         await bot.sendMessage(msg.chat.id, 'Сначала начните с /name');
+        //         return;
+        //     }
+        //     let phone = match[1].replace(/\/phone\s*/, '');
+        //     console.log(phone);
+        //     if ( !phone.match(/^((\+7|7|8)+(\-?\s*?[0-9]){10})$/) ){
+        //         await bot.sendMessage(msg.chat.id, 'Неверно введен номер телефона.\nВведите пожалуйста еще раз');
+        //         return;
+        //     }
+        //     dialog.phone = phone;
+        //     console.log(dialoges);
+        //
+        //     const gsapi = google.sheets({ version: 'v4', auth: clientLib.client });
+        //     const rowCounter = {
+        //         spreadsheetId: config.spreadsheetId,
+        //         range: `${config.listRegister}!A1:A`
+        //     };
+        //     let lastRowData = await gsapi.spreadsheets.values.get(rowCounter);
+        //     let lastRow = lastRowData.data.values.length + 1;
+        //     const updateOptions = {
+        //         spreadsheetId: config.spreadsheetId,
+        //         range: `${config.listRegister}!A${lastRow}:C${lastRow}`,
+        //         valueInputOption: 'USER_ENTERED',
+        //         resource: {
+        //             values: [[ msg.chat.id, dialog.FIO, phone.replace('+', '') ]],
+        //         }
+        //     };
+        //     try {
+        //         let data = await gsapi.spreadsheets.values.update(updateOptions);
+        //         console.log(data);
+        //         await bot.sendMessage(msg.chat.id, "Регистрирую данные");
+        //         if ( (data.status === 200)){
+        //             dialog.regState = "Done";
+        //             await bot.sendMessage(msg.chat.id, "Данные успешно зарегистрированы");
+        //             return await listServices(msg.chat.id, true);
+        //         } else {
+        //             await bot.sendMessage(msg.chat.id, "Не удалось загрузить данные в таблицу, попробуйте еще раз.");
+        //             await listServices(msg.chat.id, true);
+        //         }
+        //     } catch (e) {
+        //         console.log(e);
+        //     }
+        // });
     }
-    else if (action.match(/makechose\d/)) {
+    else if (action === 'register'){
+        await bot.sendMessage(msg.chat.id, 'Введите ФИО человека, которого вы хотите зарегистрировать в системе бота, используя команду "/name ".');
+        const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+        if (dialog){
+            dialog.state = 'register_wait_for_FIO';
+        }
+        else dialoges.push({
+            chatId: msg.chat.id,
+            state: 'register_wait_for_FIO',
+            extra: null
+        });
+        console.log(dialoges);
+    }
+    else if (action.match(/makeChoice\d/)) {
         let finalObject = action.slice(action.length - 1);
         let serviceListValue;
         let dialogStateValue;
@@ -833,3 +888,5 @@ async function actionHandler(action, msg) {
         await listServices(msg.chat.id, true);
     }
 }
+
+module.exports = bot;
