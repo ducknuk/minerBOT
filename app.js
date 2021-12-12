@@ -857,7 +857,7 @@ async function actionHandler(action, msg) {
                 range: `${config.listName}!A${lastRow}:J${lastRow}`,
                 valueInputOption: 'USER_ENTERED',
                 resource: {
-                    values: [[ dateLib.date, dateLib.dateTime, (dialog.value).slice(2, -2), dialog.valueOfPoint, dialog.targetObject, dialog.numberOfApparat, dialog.modelValue, dialog.responsibleForShipment, dialog.responsibleForDelivery, dialog.comment ]],
+                    values: [[ dateLib.date, dateLib.dateTime, dialog.value, dialog.valueOfPoint, dialog.targetObject, dialog.numberOfApparat, dialog.modelValue, dialog.responsibleForShipment, dialog.responsibleForDelivery, dialog.comment ]],
                 }
             };
             let data = await gsapi.spreadsheets.values.update(updateOptions);
