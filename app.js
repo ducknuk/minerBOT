@@ -24,6 +24,7 @@ const bot = new TelegramBot(token, { polling: true });
 const PhoneRegex = /^((\+7|7|8)+(\-?\s*?[0-9]){10})$/;
 let dialoges = [];
 let endpoint;
+let adminIDs = config.admin_chat_ids;
 
 function fillInKeyboard(list, opt, reset) {
     let keyboard = [];
@@ -89,32 +90,34 @@ async function listServices(id, del){
             if (resultForArray[i] === id.toString()) {
                 console.log('true');
                 let promo = 'Выберите действие:';
-                if ( (id.toString() === '252725776') || ( id.toString() === '414322435' ) || ( id.toString() === '5091996291' )){
-                    await bot.sendMessage(id, promo, {
-                        reply_markup: JSON.stringify({
-                            keyboard: [
-                                [{text: statesLib.ServiceList.shipment, callback_data: 'makeChoice1'}],
-                                [{text: statesLib.ServiceList.reception, callback_data: 'makeChoice2'}],
-                                [{text: statesLib.ServiceList.regNewUser, callback_data: 'register'}],
-                            ],
-                            resize_keyboard :true,
-                            one_time_keyboard: true
-                        }),
-                        parse_mode: 'Markdown'
-                    });
-                } else {
-                    await bot.sendMessage(id, promo, {
-                        reply_markup: JSON.stringify({
-                            keyboard: [
-                                [{text: statesLib.ServiceList.shipment, callback_data: 'makeChoice1'}],
-                                [{text: statesLib.ServiceList.reception, callback_data: 'makeChoice2'}],
-                            ],
-                            resize_keyboard :true,
-                            one_time_keyboard: true
-                        }),
-                        parse_mode: 'Markdown'
-                    });
+                for (let j = 0; j < adminIDs.length; j++ ){
+                    if ( id.toString() === adminIDs[j].toString() ){
+                        await bot.sendMessage(id, promo, {
+                            reply_markup: JSON.stringify({
+                                keyboard: [
+                                    [{text: statesLib.ServiceList.shipment, callback_data: 'makeChoice1'}],
+                                    [{text: statesLib.ServiceList.reception, callback_data: 'makeChoice2'}],
+                                    [{text: statesLib.ServiceList.regNewUser, callback_data: 'register'}],
+                                ],
+                                resize_keyboard :true,
+                                one_time_keyboard: true
+                            }),
+                            parse_mode: 'Markdown'
+                        });
+                        return;
+                    }
                 }
+                await bot.sendMessage(id, promo, {
+                    reply_markup: JSON.stringify({
+                        keyboard: [
+                            [{text: statesLib.ServiceList.shipment, callback_data: 'makeChoice1'}],
+                            [{text: statesLib.ServiceList.reception, callback_data: 'makeChoice2'}],
+                        ],
+                        resize_keyboard :true,
+                        one_time_keyboard: true
+                    }),
+                    parse_mode: 'Markdown'
+                });
                 return;
             }
         }
