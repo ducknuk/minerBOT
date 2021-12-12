@@ -644,26 +644,28 @@ async function actionHandler(action, msg) {
             console.log(e);
         }
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
-        let finalObject = action.slice(action.length - 1) - 0; //получение последней цифры в responsibleShipment
+        //let finalObject = [].concat(...menu);
+        let objectOfShipment = action.slice(action.length - 1);
+        console.log(objectOfShipment);
         if (dialog) {
             dialog.state = statesLib.DialogsStates.waitForResponsibleForShipment;
-            dialog.responsibleForShipment = menu[finalObject - 1];
-            dialog.extraShip = finalObject;
+            dialog.responsibleForShipment = menu[objectOfShipment - 1];
+            dialog.extraShip = objectOfShipment;
         } else dialoges.push({
             chatId: msg.chat.id,
             state: statesLib.DialogsStates.waitForResponsibleForShipment,
-            responsibleForShipment: menu[finalObject - 1],
-            extraShip: finalObject,
+            responsibleForShipment: menu[objectOfShipment - 1],
+            extraShip: objectOfShipment,
             extra: null
         });
         console.log(dialoges);
+        await bot.sendMessage(msg.chat.id, 'Ответственный за погрузку: ' + menu[objectOfShipment - 1] + '\n');
         try {
             menu = await gsrun(clientLib.client, `${config.listMenu}!E2:E`);
         } catch (e) {
             console.log(e);
         }
         let keyboard_model = fillInKeyboard(menu, 'responsibleDelivery', 'wait_for_responsible_for_shipment');
-        await bot.sendMessage(msg.chat.id, 'Выбран: ' + menu[finalObject - 1] + '\n');
         await bot.sendMessage(msg.chat.id, 'Выберите ответственного за доставку\n', {
             reply_markup: JSON.stringify({
                 inline_keyboard: keyboard_model
@@ -677,7 +679,7 @@ async function actionHandler(action, msg) {
         } catch (e) {
             console.log(e);
         }
-        let finalObject = action.slice(action.length - 1) - 0; //получение последней цифры в responsibleDelivery
+        let finalObject = action.slice(action.length - 1); //получение последней цифры в responsibleDelivery
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
         if (dialog) {
             dialog.state = statesLib.DialogsStates.waitForResponsibleForDelivery;
@@ -693,7 +695,7 @@ async function actionHandler(action, msg) {
         console.log(dialoges);
 
         if (dialog.targetObject === 'Другое'){
-            await bot.sendMessage(msg.chat.id, 'Выбран: ' + menu[finalObject] + '\n', {
+            await bot.sendMessage(msg.chat.id, 'Ответственный за доставку: ' + menu[finalObject - 1] + '\n', {
                 reply_markup: JSON.stringify({
                     inline_keyboard: [
                         [{text: 'Оставить комментарий', callback_data: 'waitForComment'}],
@@ -703,7 +705,7 @@ async function actionHandler(action, msg) {
                 parse_mode: 'Markdown'
             });
         } else {
-            await bot.sendMessage(msg.chat.id, 'Выбран: ' + menu[finalObject] + '\n', {
+            await bot.sendMessage(msg.chat.id, 'Ответственный за доставку: ' + menu[finalObject - 1] + '\n', {
                 reply_markup: JSON.stringify({
                     inline_keyboard: [
                         [{text: 'Оставить комментарий (необязательно)', callback_data: 'waitForComment'}],
@@ -729,7 +731,7 @@ async function actionHandler(action, msg) {
         if (dialog.comment === undefined ) dialog.comment = 'Отсутствует';
         if (dialog.modelValue === undefined ){
             await bot.sendMessage(msg.chat.id,
-                emoji.game_die + 'Состояние: *' + (dialog.value).slice(2, -2) + '*\n' +
+                emoji.game_die + 'Состояние: *' + dialog.value + '*\n' +
                 emoji.bank + 'Ферма: *' + dialog.valueOfPoint + '*\n' +
                 emoji.bookmark + 'Наименование: *' + dialog.targetObject + '*\n' +
                 emoji.gear + 'Количество: *' + dialog.numberOfApparat + '*\n' +
@@ -748,7 +750,7 @@ async function actionHandler(action, msg) {
             );
         } else {
             await bot.sendMessage(msg.chat.id,
-                emoji.game_die + 'Состояние: *' + (dialog.value).slice(2, -2) + '*\n' +
+                emoji.game_die + 'Состояние: *' + dialog.value + '*\n' +
                 emoji.bank + 'Ферма: *' + dialog.valueOfPoint + '*\n' +
                 emoji.bookmark + 'Наименование: *' + dialog.targetObject + '*\n' +
                 emoji.gear + 'Количество: *' + dialog.numberOfApparat + '*\n' +
