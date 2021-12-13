@@ -138,7 +138,7 @@ bot.on('message', async (msg) => {
     let valueOfNumber = msg.text;
     const dialog = dialoges.find(x => x.chatId === msg.chat.id);
     if (dialog){
-        if ( dialog.state === 'wait_for_target_object' ){
+        if ( dialog.state === 'wait_for_number_apparat' ){
             if ( valueOfNumber.match(/^\d+$/) ){
                 console.log(valueOfNumber);
                 const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -183,7 +183,7 @@ bot.on('message', async (msg) => {
                 return;
             }
         }
-        if ( (dialog.state === 'wait_for_responsible_for_delivery') && ( (msg.text).match(/(.+)/) )){
+        if ( (dialog.state === 'wait_for_comment') && ( (msg.text).match(/(.+)/) )){
             if ( (msg.text === 'Отгрузка Товара') || (msg.text === 'Прием Товара')) return;
             let commentValue = msg.text;
             const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -613,6 +613,14 @@ async function actionHandler(action, msg) {
         }
     }else if (action === 'wait_for_number_apparat') {
         await bot.sendMessage(msg.chat.id, 'Введите количество(без посторонних символов или знаков): ');
+        const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+        if (dialog) {
+            dialog.state = statesLib.DialogsStates.waitForNumberOfApparat;
+        } else dialoges.push({
+            chatId: msg.chat.id,
+            state: statesLib.DialogsStates.waitForNumberOfApparat,
+        });
+        console.log(dialoges);
         delete msg.text;
     } else if (action === 'wait_for_responsible_for_shipment'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
@@ -718,6 +726,14 @@ async function actionHandler(action, msg) {
         }
     } else if (action === 'waitForComment'){
         await bot.sendMessage(msg.chat.id, 'Оставить комментарий: \n');
+        const dialog = dialoges.find(x => x.chatId === msg.chat.id);
+        if (dialog) {
+            dialog.state = statesLib.DialogsStates.waitForComment;
+        } else dialoges.push({
+            chatId: msg.chat.id,
+            state: statesLib.DialogsStates.waitForComment,
+        });
+        console.log(dialoges);
     }else if (action === 'wait_for_accept'){
         const dialog = dialoges.find(x => x.chatId === msg.chat.id);
         if (dialog) {
